@@ -318,9 +318,10 @@
 
 	;; For each input in the sequence
 	(dotimes (i (rnn-seq-len rnn))
-		(let* ((o-veck (svref o-vecks i))
+		(let* (
+			(i-veck (svref i-vecks i))
 			(h-veck (svref h-vecks i))
-			(i-veck (svref i-vecks i)))
+			(o-veck (svref o-vecks i)))
 		;; For each neuron in the hidden layer
 		(dotimes (neuron-num n-h)
 			;; Compute output value of that neuron 
