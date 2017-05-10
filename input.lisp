@@ -4,6 +4,12 @@
 ;;          Sufyan Abbasi
 ;;=====================================
 
+;; The following expressions ensure that tail-recursive function calls 
+;; are handled appropriately/efficiently by the compiler.  
+
+(setq compiler:tail-call-self-merge-switch t)
+(setq compiler:tail-call-non-self-merge-switch t) 
+
 (defparameter *ASCII_LENGTH* 128)
 (defparameter *ASCII_OFFSET* 0)
 
@@ -40,12 +46,12 @@
 
 ;; MAKE-RNN-INPUT
 ;;--------------------------------------
-;; INPUT: char-list, a list of chars
-;;        sequence-length, the input length into the RNN
+;; INPUT: sequence-length, the input length into the RNN
 ;;                         (aka the length of char-vec)
+;;        char-list, a list of chars
 ;; OUTPUT: a vector of one-hot-vectors
 
-(defun make-rnn-input (char-list sequence-length)
+(defun make-rnn-input (sequence-length char-list)
   (let
       ((char-vec (make-array sequence-length 
 			     :initial-contents char-list)))
@@ -89,6 +95,5 @@
 	(build-list (read-char in nil) 0 nil)))))
 
 
-;;
-
-
+(defmacro generate-inputs (url seq-len)
+  `(process-chars ,url ,seq-len #'make-rnn-input ,seq-len))
