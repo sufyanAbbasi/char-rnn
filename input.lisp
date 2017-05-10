@@ -86,5 +86,9 @@
 	      (t (apply process-func (append func-params (list (rest acc))))
 		 (build-list (read-char in nil) length (append (rest acc) (list curr-char)))))))
 	
-	(build-list (read-char in nil) 0 nil))))) 
+	(build-list (read-char in nil) 0 nil)))))
+
+
+;;
+
 
