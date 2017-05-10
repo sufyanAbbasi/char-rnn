@@ -17,55 +17,11 @@
 ;;; ===============================
 ;;;  Implementation of neural networks
 (defconstant *CC* 2)
-;;;  NN struct
-;;; ------------------------------------------------------
-;;;  Neurons and edges are not explicitly represented.  Instead, the 
-;;;  information for all the neurons and edges (e.g., output values,
-;;;  weights, delta values) is contained in various vectors and arrays.
-;;;  For example, in a 3-layer network with 3 input neurons, 4 hidden neurons,
-;;;  and 2 output neurons, the NN struct would have:
-;;;     NUM-LAYERS = 3
-;;;     LAYER-SIZES = (3 4 2)
-;;;     OUTPUT-VECKS = vector of 3 vectors (one for each layer)
-;;;        output-veck #0 would have 3 entries
-;;;        output-veck #1 would have 4 entries
-;;;        output-veck #2 would have 2 entries
-;;;     DELTA-VECKS = vector of 3 vectors (similar to OUTPUT-VECKS)
-;;;     WEIGHT-ARRAYS = vector of 2 weight arrays
-;;;        weight-array #0 would be a 3-by-4 array of weights
-;;;          (corresponding to weights between 3 input neurons
-;;;           and 4 hidden neurons)
-;;;        weight-array #1 would be a 4-by-2 array of weights
-;;;          (corresponding to weights between 4 hidden neurons
-;;;           and 2 output neurons)
 
-(defstruct nn
-	;; NUM-LAYERS:  the number of layers in the neural network
-	num-layers    
-	;; LAYER-SIZES:  a vector specifying the number of neurons in each layer
-	;;   (The input layer is layer 0; the output layer is layer (1- num-layers)
-	layer-sizes   
-	;; OUTPUT-VECKS:  A vector of vectors.
-	;;  Each neuron has an associated output value.
-	;;  (svref output-vecks i) -- is a vector of the computed output
-	;;        values for the neurons in layer i.
-	output-vecks 
-	;; WEIGHT-ARRAYS:  A vector of arrays.
-	;;  (svref weight-arrays i) -- is an MxN array holding the weights
-	;;        for all edges between layer i and layer (i+1).
-	;;        M = number of neurons in layer i; N = number of neurons in layer (i+1)
-	weight-arrays 
-	;; DELTA-VECKS:  A vector of vectors.
-	;;  Each neuron (except those in the input layer) has an associated
-	;;  DELTA value computed during back-propagation.
-	;;  (svref delta-vecks i) -- is a vector of the delta values for
-	;;       the neurons in layer i.
-	delta-vecks   
-	)
 
 ;;;  RNN struct
 ;;; ------------------------------------------------------
-;;;  Generates
+;;;  Generates an empty recurrent neural network
 (defstruct rnn
 	;; SEQ-LEN:  the length of the sequence the RNN reads
 	seq-len    
@@ -99,59 +55,6 @@
 	h-o-weights
 	)
 
-;;;  INIT-NN
-;;; -----------------------------------------
-;;;  INPUT:  SIZES-OF-LAYERS, a list of numbers indicating how
-;;;           many neurons are in each layer.  (Layer 0 corresponds
-;;;           to the input layer).
-;;;  OUTPUT:  A neural network (NN struct) of that size, initialized
-;;;           with weights randomly selected between -0.5 and +0.5.
-
-(defun init-nn (sizes-of-layers)
-	(let* (;; NUM-LAYERS:  the number of layers in the network
-		(num-layers (length sizes-of-layers))
-		;; LAYER-SIZES:  a vector whose ith element will say how many
-		;;  neurons are in layer i
-		(layer-sizes (make-array num-layers))
-		;; OUTPUT-VECKS:  a vector of vectors.  The ith vector will
-		;;  contain output values for each neuron in layer i
-		(output-vecks (make-array num-layers))
-		;; DELTA-VECKS:  similar to output-vecks, except they contain
-		;;  the delta values for each neuron
-		(delta-vecks (make-array num-layers))
-		;; WEIGHT-ARRAYS:  see documentation of NN struct
-		(weight-arrays (make-array (1- num-layers)))
-		;; NN: the network
-		(nn (make-nn :num-layers num-layers
-			:layer-sizes layer-sizes
-			:output-vecks output-vecks
-			:weight-arrays weight-arrays
-			:delta-vecks delta-vecks)))
-	;; For each layer...
-	(dotimes (i num-layers)
-		;; Set the size of that layer (i.e., how many neurons)
-		(setf (svref layer-sizes i) (nth i sizes-of-layers))
-		;; Create a vector of output values for the neurons in that layer
-		(setf (svref output-vecks i) (make-array (svref layer-sizes i)
-			:initial-element nil))
-		;; Create a vector of delta values for the neurons in that layer
-		(setf (svref delta-vecks i) (make-array (svref layer-sizes i)
-			:initial-element nil))
-		;; For non-input neurons, create an array of weights
-		;; corresponding to edges between current layer and previous layer
-		(when (> i 0)
-			(let* ((num-rows (svref layer-sizes (1- i)))
-				(num-cols (svref layer-sizes i))
-				;; The array of weights
-				(harry (make-array (list num-rows num-cols))))
-			(setf (svref weight-arrays (1- i)) harry)
-			;; randomize weights
-			(dotimes (i num-rows)
-				(dotimes (j num-cols)
-					(setf (aref harry i j) (- (/ (random 100) 100) 0.5)))))))
-	;; return the NN
-	nn))
-
 ;;;  INIT-RNN
 ;;; -----------------------------------------
 ;;;  INPUT:  SIZES-OF-LAYERS, a list of numbers indicating how
@@ -179,9 +82,9 @@
 			)))
 
 	(dotimes (i seq-len)
-			(setf (svref i-vecks i) (make-array *CC*))
-			(setf (svref h-vecks i) (make-array n-h))
-			(setf (svref o-vecks i) (make-array *CC*))
+		(setf (svref i-vecks i) (make-array *CC*))
+		(setf (svref h-vecks i) (make-array n-h))
+		(setf (svref o-vecks i) (make-array *CC*))
 		)
 
 	(dotimes (j *CC*)
@@ -204,27 +107,6 @@
 	rnn
 	)
 	)
-
-;;;  ERASE-OUTPUTS
-;;; -----------------------------------------------------
-;;;  INPUT:  NN, a neural network
-;;;  OUTPUT:  T
-;;;  SIDE-EFFECT: Destructively modifies NN by setting all output
-;;;   values to NIL (usually done before the FEED-FORWARD process).
-
-(defun erase-outputs (nn)
-	(let ((out-vecks (nn-output-vecks nn))
-		(num (nn-num-layers nn))
-		(lay-sizes (nn-layer-sizes nn)))
-	;; For each layer...
-	(dotimes (i num)
-		(let ((num-neurons (svref lay-sizes i))
-			(outputs (svref out-vecks i)))
-		;; For each neuron in that layer...
-		(dotimes (j num-neurons)
-			;; Set that neuron's output value to NIL
-			(setf (svref outputs j) nil))))
-	t))
 
 ;;;  ERASE-RNN-OUTPUTs
 ;;; -----------------------------------------------------
@@ -315,29 +197,50 @@
 		(h-h-weights (rnn-h-h-weights rnn))
 		(h-o-weights (rnn-h-o-weights rnn)))
 
-
 	;; For each input in the sequence
 	(dotimes (i (rnn-seq-len rnn))
 		(let* (
 			(i-veck (svref i-vecks i))
 			(h-veck (svref h-vecks i))
 			(o-veck (svref o-vecks i)))
+		
 		;; For each neuron in the hidden layer
 		(dotimes (neuron-num n-h)
 			;; Compute output value of that neuron 
+
 			(setf (svref h-veck neuron-num)
 				;; TANH of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
 				;;  (INPUTS for this neuron are OUTPUTS from neurons 
 				;;     in previous layer)
-				(tanh (let ((dot-prod 0))
-					(dotimes (j *CC*)
-						(incf dot-prod
-							(* (svref i-veck j)
-								(aref i-h-weights j neuron-num))))
-					dot-prod)))
+
+				(if (= i 0)
+					;; If this is the first of the sequence, just pass normally
+					(tanh (let ((dot-prod 0))
+						(dotimes (j *CC*)
+							(incf dot-prod
+								(* (svref i-veck j)
+									(aref i-h-weights j neuron-num))))
+						dot-prod))
+					;; Otherwise consider the previous hidden layer in the sequence
+					(tanh (+ 
+						(let ((dot-prod 0))
+							(dotimes (j n-h)
+								(incf dot-prod
+									(* (svref (svref h-vecks (- i 1)) j)
+										(aref h-h-weights j neuron-num))))
+							dot-prod)
+						(let ((dot-prod 0))
+							(dotimes (j *CC*)
+								(incf dot-prod
+									(* (svref i-veck j)
+										(aref i-h-weights j neuron-num))))
+							dot-prod)
+						)
+					)
+					)
+				)
 			)
 
-		;;HIDDEN LAYER COMMUNICATION GOES HERE
 
 		;; For each neuron in the output layer
 		(dotimes (neuron-num *CC*)
@@ -453,6 +356,109 @@
 
 	;; return the NN
 	nn))
+
+
+
+
+;;;  TRAIN-ONE
+;;; ----------------------------------------------------
+;;;  INPUTS:  NN, a neural network
+;;;           ALPHA, a small positive number that specifies the sensitivity
+;;;             of updates to the error
+;;;           INPUTS, a list of input values for the neurons in the input layer
+;;;           TARGET-OUTPUTS, the desired outputs for neurons in the output
+;;;             layer, given the specified INPUTS.
+;;;  OUTPUT:  NN
+;;;  SIDE EFFECT:  Uses FEED-FORWARD to generate output values for
+;;;   the given inputs; then uses the BACK-PROPAGATION algorithm to
+;;;   generate DELTA values for each neuron (starting from output layer
+;;;   and working back to first hidden layer); then uses the DELTA values
+;;;   to update each non-input neuron.
+
+(defun train-rnn-one (rnn alpha inputs target-outputs)
+	(format T "~A" rnn)
+	(rnn-ff rnn inputs)
+	(format T "~%-------- After Forward Pass --------~%")
+	(format T "~A" rnn)
+
+	(let* 
+
+		((n-h (rnn-n-h rnn)))
+
+		;; For each input in the sequence
+		(dotimes (n (rnn-seq-len rnn))
+			;; Back prop algorithm...
+			(let* 
+				(
+					;; The delta gradients
+					(i-h-gradi (make-array n-h))
+					(h-h-gradi (make-array n-h))
+					(h-o-gradi (make-array *CC*))
+
+					(target-output-n (svref target-outputs n))
+
+					;; The weights & values for this member of the sequence
+					(i-h-weights (rnn-i-h-weights rnn))
+					(h-o-weights (rnn-h-o-weights rnn))
+					(i-veck (svref (rnn-i-vecks rnn) n))
+					(h-veck (svref (rnn-h-vecks rnn) n))
+					(o-veck (svref (rnn-o-vecks rnn) n))
+					)
+
+				;; for each neuron in the output layer:
+				(dotimes (neuron-num *CC*)
+					(let* (
+						(target-output (svref target-output-n neuron-num))
+						(my-output (svref o-veck neuron-num))
+						(diffy (- target-output my-output)))
+					(setf (svref h-o-gradi neuron-num)
+						(* my-output (- 1 my-output) diffy))))
+
+				;; for each neuron in the hidden layer...
+				(dotimes (neuron-num n-h)
+					(let* (
+						(my-output (svref h-veck neuron-num))
+						(sum (let ((dotty 0))
+							(dotimes (j *CC*)
+								(incf dotty (* (aref h-o-weights neuron-num j)
+									(svref h-o-gradi j))))
+							dotty)))
+					(setf (svref i-h-gradi neuron-num)
+						(* my-output (- 1 my-output) sum))))
+
+				;; Now, update all of the weights in the network using the DELTA values
+				;; >>> i-h
+				;; For each neuron N_i in that layer...
+				(dotimes (i *CC*)
+					;; For each neuron N_j in the following layer...
+					(dotimes (j n-h)
+						;; Update the weight on the edge from N_i to N_j
+						;; W_I_J += ALPHA * A_I * DELTA_J
+						(incf (aref i-h-weights i j)
+							(* alpha 
+								(svref o-veck i) 
+								(svref i-h-gradi j)))))
+				;; >>> h-o
+				;; For each neuron N_i in that layer...
+				(dotimes (i n-h)
+					;; For each neuron N_j in the following layer...
+					(dotimes (j *CC*)
+						;; Update the weight on the edge from N_i to N_j
+						;; W_I_J += ALPHA * A_I * DELTA_J
+						(incf (aref h-o-weights i j)
+							(* alpha 
+								(svref h-veck i) 
+								(svref h-o-gradi j)))))
+
+				)
+			)
+		;; return the RNN
+		(format T "~%-------- After backprop --------~%")
+		(format T "~A" rnn)
+		(format T "~%~%~%~A" (rnn-o-vecks rnn))
+		; rnn
+		)
+	)
 
 ;;;  TRAIN-ALL
 ;;; ------------------------------------------
