@@ -16,7 +16,7 @@
 ;;;  NEW-NN.LISP
 ;;; ===============================
 ;;;  Implementation of neural networks
-(defconstant *CC* 2)
+(defconstant *CC* 3)
 
 
 ;;;  RNN struct
@@ -209,20 +209,20 @@
 			;; Compute output value of that neuron 
 
 			(setf (svref h-veck neuron-num)
-				;; TANH of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
+				;; sigmoid of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
 				;;  (INPUTS for this neuron are OUTPUTS from neurons 
 				;;     in previous layer)
 
 				(if (= i 0)
 					;; If this is the first of the sequence, just pass normally
-					(tanh (let ((dot-prod 0))
+					(sigmoid (let ((dot-prod 0))
 						(dotimes (j *CC*)
 							(incf dot-prod
 								(* (svref i-veck j)
 									(aref i-h-weights j neuron-num))))
 						dot-prod))
 					;; Otherwise consider the previous hidden layer in the sequence
-					(tanh (+ 
+					(sigmoid (+ 
 						(let ((dot-prod 0))
 							(dotimes (j n-h)
 								(incf dot-prod
@@ -246,10 +246,10 @@
 		(dotimes (neuron-num *CC*)
 			;; Compute output value of that neuron 
 			(setf (svref o-veck neuron-num)
-				;; TANH of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
+				;; sigmoid of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
 				;;  (INPUTS for this neuron are OUTPUTS from neurons 
 				;;     in previous layer)
-				(tanh (let ((dot-prod 0))
+				(sigmoid (let ((dot-prod 0))
 					(dotimes (j n-h)
 						(incf dot-prod
 							(* (svref h-veck j)
@@ -376,10 +376,10 @@
 ;;;   to update each non-input neuron.
 
 (defun train-rnn-one (rnn alpha inputs target-outputs)
-	(format T "~A" rnn)
+	; (format T "~A" rnn)
 	(rnn-ff rnn inputs)
-	(format T "~%-------- After Forward Pass --------~%")
-	(format T "~A" rnn)
+	; (format T "~%-------- After Forward Pass --------~%")
+	; (format T "~A" rnn)
 
 	(let* 
 
@@ -399,6 +399,7 @@
 
 					;; The weights & values for this member of the sequence
 					(i-h-weights (rnn-i-h-weights rnn))
+					(h-h-weights (rnn-h-h-weights rnn))
 					(h-o-weights (rnn-h-o-weights rnn))
 					(i-veck (svref (rnn-i-vecks rnn) n))
 					(h-veck (svref (rnn-h-vecks rnn) n))
@@ -411,10 +412,11 @@
 						(target-output (svref target-output-n neuron-num))
 						(my-output (svref o-veck neuron-num))
 						(diffy (- target-output my-output)))
+					; (format T "~%[[[[[[[[~A]]]]]]]]~%" diffy)
 					(setf (svref h-o-gradi neuron-num)
 						(* my-output (- 1 my-output) diffy))))
 
-				;; for each neuron in the hidden layer...
+				;; i-h
 				(dotimes (neuron-num n-h)
 					(let* (
 						(my-output (svref h-veck neuron-num))
@@ -423,8 +425,49 @@
 								(incf dotty (* (aref h-o-weights neuron-num j)
 									(svref h-o-gradi j))))
 							dotty)))
-					(setf (svref i-h-gradi neuron-num)
-						(* my-output (- 1 my-output) sum))))
+					(incf (svref i-h-gradi neuron-num)
+						(* my-output (- 1 my-output) sum))
+					)
+					)
+
+
+				;; h-h
+				;; i-h
+				(dotimes (hnn n)
+					(let*
+						(
+							(hn (- (- n hnn) 1))
+							(hn-veck (svref (rnn-h-vecks rnn) hn))
+							)
+
+						;; h-h
+						(dotimes (neuron-num n-h)
+							(let* (
+								(my-output (svref hn-veck neuron-num))
+								(sum (let ((dotty 0))
+									(dotimes (j *CC*)
+										(incf dotty (* (aref h-o-weights neuron-num j)
+											(svref h-o-gradi j))))
+									dotty)))
+							(incf (svref h-h-gradi neuron-num)
+								(* my-output (- 1 my-output) sum))))
+
+						;; i-h
+						(dotimes (neuron-num n-h)
+							(let* (
+								(my-output (svref hn-veck neuron-num))
+								(sum2 (let ((dotty 0))
+									(dotimes (j n-h)
+										(incf dotty (* (aref h-h-weights neuron-num j)
+											(svref h-h-gradi j))))
+									dotty))
+								)
+							(incf (svref i-h-gradi neuron-num)
+								(* my-output (- 1 my-output) sum2))
+							)
+							)
+						)
+					)
 
 				;; Now, update all of the weights in the network using the DELTA values
 				;; >>> i-h
@@ -436,8 +479,21 @@
 						;; W_I_J += ALPHA * A_I * DELTA_J
 						(incf (aref i-h-weights i j)
 							(* alpha 
-								(svref o-veck i) 
+								(svref i-veck i) 
 								(svref i-h-gradi j)))))
+
+				; ;; >>> h-h
+				; ;; For each neuron N_i in that layer...
+				(dotimes (i n-h)
+					;; For each neuron N_j in the following layer...
+					(dotimes (j n-h)
+						;; Update the weight on the edge from N_i to N_j
+						;; W_I_J += ALPHA * A_I * DELTA_J
+						(incf (aref h-h-weights i j)
+							(* alpha 
+								(svref h-veck i) 
+								(svref h-h-gradi j)))))
+
 				;; >>> h-o
 				;; For each neuron N_i in that layer...
 				(dotimes (i n-h)
@@ -449,12 +505,11 @@
 							(* alpha 
 								(svref h-veck i) 
 								(svref h-o-gradi j)))))
-
 				)
 			)
 		;; return the RNN
-		(format T "~%-------- After backprop --------~%")
-		(format T "~A" rnn)
+		; (format T "~%-------- After backprop --------~%")
+		; (format T "~A" rnn)
 		(format T "~%~%~%~A" (rnn-o-vecks rnn))
 		; rnn
 		)
