@@ -44,21 +44,35 @@
 (defmacro index-to-char (index)
     `(code-char (+ ,index *ASCII_OFFSET*)))
 
-;; MAKE-RNN-INPUT
+;; TRAIN-RNN-INPUT
 ;;--------------------------------------
 ;; INPUT: sequence-length, the input length into the RNN
 ;;                         (aka the length of char-vec)
-;;        char-list, a list of chars
-;; OUTPUT: a vector of one-hot-vectors
+;;        train-rnn-func, the function that trains an RNN
+;;        rnn, the rnn to train
+;;        alpha, the alpha value for the rnn
+;;        char-list-input, a list of chars as input
+;;        char-list-output, a list of chars as output
+;; OUTPUT: NIL
+;; SIDE-EFFECT: calls the train-rnn function with the given input output one-hot-vector pairs
 
-(defun make-rnn-input (sequence-length char-list)
+(defun train-rnn-input (sequence-length train-rnn-func rnn alpha char-list-input char-list-output)
   (let
-      ((char-vec (make-array sequence-length 
-			     :initial-contents char-list)))
-    (dotimes (i sequence-length char-vec)
-      (setf (svref char-vec i) (char-one-hot-vec (svref char-vec i))))))
-
-
+      ((char-vec-input (make-array sequence-length 
+				   :initial-contents char-list-input))
+					;:element-type 'character)))
+       (char-vec-output (make-array sequence-length
+				    :initial-contents char-list-output)))
+    
+    (funcall train-rnn-func 
+	     rnn 
+	     alpha 
+	     (dotimes (i sequence-length char-vec-input)
+	       (setf (svref char-vec-input i) (char-one-hot-vec (svref char-vec-input i))))
+	     (dotimes (i sequence-length char-vec-output)
+	       (setf (svref char-vec-output i) (char-one-hot-vec (svref char-vec-output i)))))))
+  
+  
 ;; PROCESS-CHARS
 ;;-------------------------------------
 ;; INPUT: path-to-file, a file path string
@@ -67,7 +81,7 @@
 ;;                     where each character is the last argument
 ;;       &rest func-params, the rest of the arguments in process-func
 ;; OUTPUT: NIL
-;; SIDE-EFFECT: Calls process-func on each character in the text file
+;; SIDE-EFFECT: Calls process-func with char-list-input and char-list-output as last two parameters
 
 (defun process-chars (path-to-file sequence-length process-func &rest func-params)
   (let ((in (open path-to-file :if-does-not-exist nil)))
@@ -75,25 +89,28 @@
       (labels
 	  ((build-list (curr-char length acc)
 	     (cond
-	      ;;Base-Case: next-char is nil, at end of file,
-	      ;;             so close the file
+	      ;;Basecase: next-char is nil, at end of file,
+	      ;;          so close the file
 	      ((not curr-char) (close in))
-
-	      ;;Recursive-Case 1: acc is not big enough,
+	      
+	      ;;Recursive Case 1: acc is not big enough,
 	      ;;                  append the curr-char on to the list
-	      ((< length sequence-length) (build-list (read-char in nil) 
-						      (incf length) (append acc (list curr-char))))
-	      ;;Recursive-Case 2: acc length is equal to sequence length,
+	      ((< length (1+ sequence-length)) (build-list (read-char in nil) 
+							   (incf length) (append acc (list curr-char))))
+	      ;;Recursive Case 2: acc length is equal to sequence length + 1,
 	      ;;                  run function on acc and append the next char on
-	      ((= sequence-length length) (apply process-func (append func-params (list acc)))
-					  (build-list (read-char in nil) (incf length) (append acc (list curr-char))))
-	      ;;Recursive-Case 3: acc length is greater than sequence length,
-	      ;;                  run function on rest of acc and append the next char on the rest of acc
-	      (t (apply process-func (append func-params (list (rest acc))))
-		 (build-list (read-char in nil) length (append (rest acc) (list curr-char)))))))
-	
+	       ((= (1+ sequence-length) length) (apply process-func (append func-params (list (butlast acc) (rest acc))))
+						(build-list (read-char in nil) (incf length) (append acc (list curr-char))))
+	       ;;Recursive Case 3: acc length is greater than sequence length,
+	       ;;                  run function on rest of acc and append the next char on the rest of acc
+	       (t (apply process-func (append func-params (list (butlast (rest acc)) (rest (rest acc)))))
+		  (build-list (read-char in nil) length (append (rest acc) (list curr-char)))))))
+	   
 	(build-list (read-char in nil) 0 nil)))))
 
+(defmacro print-lists (url seq-len)
+  `(process-chars ,url ,seq-len #'format t "~A, ~A~%"))
 
-(defmacro generate-inputs (url seq-len)
-  `(process-chars ,url ,seq-len #'make-rnn-input ,seq-len))
+(defmacro train-rnn-text (url seq-len train-func rnn alpha)
+  `(process-chars ,url ,seq-len #'train-rnn-input ,seq-len ,train-func ,rnn ,alpha))
+
