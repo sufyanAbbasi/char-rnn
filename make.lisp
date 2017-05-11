@@ -10,7 +10,7 @@
   (dolist (file *list-o-files*)
     (compile-file file)
     (load file))
-  (setf bob (init-rnn 5 50))
+  (setf bob (init-rnn 5 400))
   (setf iar1 (make-array 3 :initial-contents '(.5 .5 .5)))
   (setf iar2 (make-array 3 :initial-contents '(.5 .5 .5)))
   (setf iar3 (make-array 3 :initial-contents '(.5 .5 .5)))

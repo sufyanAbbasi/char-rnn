@@ -86,17 +86,17 @@
 			(dotimes (sn sl)
 				(let (
 					(ohv-out (convertToOneHot (svref (rnn-o-vecks rnn) sn)))
-					)
+				)
 				; Print it
 				; (format T "~A" ohv-out)
 				(format T "~A" (one-hot-vec-char ohv-out))
 				; Set to input
 				(setf (svref inputs sn) ohv-out)
 				)
-				)
 			)
 		)
 	)
+)
 
 ;;;  INIT-RNN
 ;;; -----------------------------------------
@@ -378,7 +378,8 @@
 						(svref next-delta-veck j))))
 				dotty)))
 		(setf (svref my-delta-veck i)
-			(* my-output (- 1 my-output) sum))))))
+			(* my-output (- 1 my-output) sum)))))
+	)
 
 ;; Now, update all of the weights in the network using the DELTA values
 ;;  For each layer...
@@ -419,10 +420,6 @@ nn))
 ;;;   to update each non-input neuron.
 
 (defun train-rnn-one (rnn alpha inputs target-outputs)
-	(format T "~A" rnn)
-	(rnn-ff rnn inputs)
-	(format T "~%-------- After Forward Pass --------~%")
-	(format T "~A" rnn)
 
 	(let* 
 
@@ -495,12 +492,9 @@ nn))
 
 		)
 	)
-;; return the RNN
-(format T "~%-------- After backprop --------~%")
-(format T "~A" rnn)
-(format T "~%~%~%~A" (rnn-o-vecks rnn))
-; rnn
 )
+	(format t "~%---------------~A-----------------~%")
+	(babble rnn 10)
 )
 
 ;;;  TRAIN-ALL
