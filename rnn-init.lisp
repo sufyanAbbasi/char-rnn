@@ -54,11 +54,9 @@
 		(oneHot (make-array *CC* :initial-element 0))
 		)
 	(dotimes (i *CC*)
-		(when (> (svref outputVec i) max) (setf max (svref outputVec i)))
-
-		(when (= (random 2) 0) (setf i (+ i 1)))
+		(setf i (+ i (random 10)))
+		(when (and (< i *CC*) (> (svref outputVec i) max)) (setf max (svref outputVec i)))
 		)
-	;(format T "~A" max)
 
 	(dotimes (i *CC*)
 		(when (or foundHot (not (= (svref outputVec i) max)))
@@ -137,7 +135,7 @@
 
 	(dotimes (j *CC*)
 		(dotimes (k n-h)
-			(setf (aref i-h-weights j k) (+ (random (/ 2 (sqrt *CC*))) (/ -1 (sqrt *CC*))))
+			(setf (aref i-h-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
 			)
 		)
 	(dotimes (j n-h)
@@ -277,12 +275,12 @@
 									(* (svref (svref h-vecks (- i 1)) j)
 										(aref h-h-weights j neuron-num))))
 							dot-prod)
-						(let ((dot-prod 0))
+						(let ((dot-prod2 0))
 							(dotimes (j *CC*)
-								(incf dot-prod
+								(incf dot-prod2
 									(* (svref i-veck j)
 										(aref i-h-weights j neuron-num))))
-							dot-prod)
+							dot-prod2)
 						)
 					)
 					)
