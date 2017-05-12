@@ -343,9 +343,9 @@
 			(let* 
 				(
 					;; The delta gradients
-					(i-h-gradi (make-array n-h))
-					(h-h-gradi (make-array n-h))
-					(h-o-gradi (make-array *CC*))
+					(i-h-gradi (make-array n-h :initial-element 0))
+					(h-h-gradi (make-array n-h :initial-element 0))
+					(h-o-gradi (make-array *CC* :initial-element 0))
 
 					(target-output-n (svref target-outputs n))
 
