@@ -129,27 +129,49 @@
 (defun process-chars (path-to-file sequence-length process-func &rest func-params)
   (let ((in (open path-to-file :if-does-not-exist nil)))
     (when in
-      (labels
-	  ((build-list (curr-char length acc)
-	     (cond
-	      ;;Basecase: next-char is nil, at end of file,
-	      ;;          so close the file
-	      ((not curr-char) (close in))
-	      
-	      ;;Recursive Case 1: acc is not big enough,
-	      ;;                  append the curr-char on to the list
-	      ((< length (1+ sequence-length)) (build-list (read-char in nil) 
-							   (incf length) (append acc (list curr-char))))
-	      ;;Recursive Case 2: acc length is equal to sequence length + 1,
-	      ;;                  run function on acc and append the next char on
+      (let ((length 0)
+	    (acc nil))
+	(loop for curr-char = (read-char in nil)
+	    while curr-char do 
+	      (cond
+	       ;;Case 1: acc is not big enough,
+	       ;;        append the curr-char on to the list
+	       ((< length (1+ sequence-length)) (incf length)
+						(setf acc (append acc (list curr-char))))
+	       ;;Case 2: acc length is equal to sequence length + 1,
+	       ;;        run function on acc and append the next char on
 	       ((= (1+ sequence-length) length) (apply process-func (append func-params (list (butlast acc) (rest acc))))
-						(build-list (read-char in nil) (incf length) (append acc (list curr-char))))
-	       ;;Recursive Case 3: acc length is greater than sequence length,
-	       ;;                  run function on rest of acc and append the next char on the rest of acc
+						(incf length) 
+						(setf acc (append acc (list curr-char))))
+	       ;;Case 3: acc length is greater than sequence length,
+;	       ;;        run function on rest of acc and append the next char on the rest of acc
 	       (t (apply process-func (append func-params (list (butlast (rest acc)) (rest (rest acc)))))
-		  (build-list (read-char in nil) length (append (rest acc) (list curr-char)))))))
-	   
-	(build-list (read-char in nil) 0 nil)))))
+		  (setf acc (append (rest acc) (list curr-char))))))
+	;;Grabs the last input output pair (it misses the last one otherwise)
+	(apply process-func (append func-params (list (butlast (rest acc)) (rest (rest acc)))))
+	(close in)))))
+      
+;      (labels
+;	  ((build-list (curr-char length acc)
+;	     (cond
+;	      ;;Basecase: next-char is nil, at end of file,
+;	      ;;          so close the file
+;	      ((not curr-char) (close in))
+;	      
+;	      ;;Recursive Case 1: acc is not big enough,
+;	      ;;                  append the curr-char on to the list
+;	      ((< length (1+ sequence-length)) (build-list (read-char in nil) 
+;							   (incf length) (append acc (list curr-char))))
+;	      ;;Recursive Case 2: acc length is equal to sequence length + 1,
+;	      ;;                  run function on acc and append the next char on
+;	       ((= (1+ sequence-length) length) (apply process-func (append func-params (list (butlast acc) (rest acc))))
+;						(build-list (read-char in nil) (incf length) (append acc (list curr-char))))
+;	       ;;Recursive Case 3: acc length is greater than sequence length,
+;	       ;;                  run function on rest of acc and append the next char on the rest of acc
+;	       (t (apply process-func (append func-params (list (butlast (rest acc)) (rest (rest acc)))))
+;		  (build-list (read-char in nil) length (append (rest acc) (list curr-char)))))))
+;	   
+;	(build-list (read-char in nil) 0 nil)))))
 
 (defmacro print-lists (url seq-len)
   `(process-chars ,url ,seq-len #'format t "~A, ~A~%"))
