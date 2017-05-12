@@ -9,7 +9,7 @@
 ;;;  NEW-NN.LISP
 ;;; ===============================
 ;;;  Implementation of neural networks
-(defconstant *CC* 128)
+(defconstant *CC* 96)
 
 
 ;;;  RNN struct
@@ -78,7 +78,7 @@
 			)
 
 		(dotimes (sn sl)
-			(setf (svref inputs sn) (make-array *CC*))
+			(setf (svref inputs sn) (make-array *CC* :initial-element 0))
 			)
 
 		(dotimes (i length)
@@ -125,9 +125,9 @@
 			)))
 
 	(dotimes (i seq-len)
-		(setf (svref i-vecks i) (make-array *CC*))
-		(setf (svref h-vecks i) (make-array n-h))
-		(setf (svref o-vecks i) (make-array *CC*))
+		(setf (svref i-vecks i) (make-array *CC* :initial-element 0))
+		(setf (svref h-vecks i) (make-array n-h :initial-element 0))
+		(setf (svref o-vecks i) (make-array *CC* :initial-element 0))
 		)
 
 	(dotimes (j *CC*)
@@ -420,7 +420,6 @@ nn))
 ;;;   to update each non-input neuron.
 
 (defun train-rnn-one (rnn alpha inputs target-outputs)
-
 	(let* 
 
 		((n-h (rnn-n-h rnn)))
@@ -493,8 +492,8 @@ nn))
 		)
 	)
 )
-	(format t "~%---------------~A-----------------~%")
-	(babble rnn 10)
+	(format t "~%---------------~A-----------------~%"
+	(babble rnn 10))	
 )
 
 ;;;  TRAIN-ALL
