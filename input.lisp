@@ -181,4 +181,3 @@
 
 (defmacro train-rnn-text (url train-func rnn alpha)
   `(process-chars ,url (rnn-seq-len ,rnn) #'train-rnn-input ,train-func ,rnn ,alpha))
-
