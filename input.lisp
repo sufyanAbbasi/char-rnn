@@ -10,22 +10,61 @@
 (setq compiler:tail-call-self-merge-switch t)
 (setq compiler:tail-call-non-self-merge-switch t) 
 
-(defparameter *ASCII_LENGTH* 128)
-(defparameter *ASCII_OFFSET* 0)
+(defparameter *ASCII-LENGTH* 128)
+(defparameter *ASCII-OFFSET* 32)
+(defparameter *ONE-HOT-LENGTH* 96)
 
+;;one hot vector will start at space character (32) and span to the end of ASCII table, 
+;;then the last index will be line carriage (13)
+
+;;hash table that maps a character to a one-hot-vector
+(defparameter *one-hot-hash* (make-hash-table))
+
+;;hash table that maps an index of one-hot-vector to a character
+(defparameter *one-hot-index* (make-hash-table))
+
+;; INDEX-ONE-HOT-VEC
+;;--------------------------------------
+;; INPUT: index, an index into a one-hot-vec
+;; OUTPUT: a one-hot vector with index set to 1
+
+(defmacro index-one-hot-vec (index)
+  `(let
+       ((vecty (make-array *ONE-HOT-LENGTH*
+			   :initial-element 0
+			   :adjustable NIL
+			   :element-type 'integer)))
+     (setf (svref vecty ,index) 1)
+     vecty))
+
+;;FILL THE HASH TABLES
+
+(dotimes (i *ASCII-LENGTH*)
+  (cond
+   ;;ASCII 13: map line carriage to the last index
+   ((= i (char-code #\Return))
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (1- *ONE-HOT-LENGTH*)))
+    (setf (gethash (1- *ONE-HOT-LENGTH*) *one-hot-index*) #\Return)) 
+   ;;ASCII 0 - 31: map control characters and DEL to a #
+   ((or (< i *ASCII-OFFSET*) (= i (1- *ASCII-LENGTH*)))
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- (char-code #\#) *ASCII-OFFSET*)))
+    (setf (gethash (- (char-code #\#) *ASCII-OFFSET*) *one-hot-index*) #\#))
+   ;;ASCII 32 - 127: map character to its offsetted index
+   (t 
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- i *ASCII-OFFSET*)))
+    (setf (gethash (- i *ASCII-OFFSET*) *one-hot-index*) (code-char i)))))
+
+
+;;ASCII characters 32 (space) -> 90 (Z) + line_carriage (13)
+      
+      
 ;; CHAR-ONE-HOT-VEC
 ;;--------------------------------------
 ;; INPUT: char, an ascii character
 ;; OUTPUT: a one-hot vector representation of the character
 
-(defun char-one-hot-vec (char)
-  (let 
-      ((vecty (make-array (- *ASCII_LENGTH* *ASCII_OFFSET*)
-			  :initial-element 0
-			  :adjustable NIL
-			  :element-type 'integer)))
-    (setf (svref vecty (- (char-code char) *ASCII_OFFSET*)) 1)
-    vecty))
+(defmacro char-one-hot-vec (char)
+  `(gethash ,char *one-hot-hash*))
 
 ;; ONE-HOT-VEC-CHAR
 ;;--------------------------------------
@@ -33,16 +72,8 @@
 ;; OUTPUT: the ascii character represented by the one-hot-vector
 
 (defmacro one-hot-vec-char (ohv)
-  `(code-char (+ (position 1 ,ohv) *ASCII_OFFSET*)))
+  `(gethash (position 1 ,ohv) *one-hot-index*))
 
-
-;; INDEX-TO-CHAR
-;;--------------------------------------
-;; INPUT: index, an index into a one-hot vec
-;; OUTPUT: the associated character 
-
-(defmacro index-to-char (index)
-    `(code-char (+ ,index *ASCII_OFFSET*)))
 
 ;; TRAIN-RNN-INPUT
 ;;--------------------------------------
