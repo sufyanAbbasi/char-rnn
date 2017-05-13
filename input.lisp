@@ -163,7 +163,7 @@
   (format t "Time-Elapsed: ~$ minutes~%Processed: ~A~%Time/Processed: ~$ms~%~%" 
     (/ (- end-time starting-time) 60) 
     num-processed 
-    (* (/ (- end-time starting-time) num-processed) 1000)))))))
+    (* (/ (- end-time starting-time) num-processed) 1000))))))
       
 ;      (labels
 ;	  ((build-list (curr-char length acc)
