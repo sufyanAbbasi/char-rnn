@@ -71,8 +71,8 @@
 ;; INPUT: ohv, a one-hot-vector  
 ;; OUTPUT: the ascii character represented by the one-hot-vector
 
-(defmacro one-hot-vec-char (ohv)
-  `(gethash (position 1 ,ohv) *one-hot-index*))
+(defun one-hot-vec-char (ohv)
+  (gethash (position 1 ohv) *one-hot-index*))
 
 
 ;; TRAIN-RNN-INPUT
@@ -127,12 +127,21 @@
 ;; SIDE-EFFECT: Calls process-func with char-list-input and char-list-output as last two parameters
 
 (defun process-chars (path-to-file sequence-length process-func &rest func-params)
-  (let ((in (open path-to-file :if-does-not-exist nil)))
+  (let ((in (open path-to-file :if-does-not-exist nil))
+        (num-processed 0)
+        (starting-time (get-universal-time))
+        (end-time 0))
     (when in
       (let ((length 0)
 	    (acc nil))
 	(loop for curr-char = (read-char in nil)
 	    while curr-char do 
+      (when (= (mod (incf num-processed) 10000) 0)
+       (setf end-time (get-universal-time))
+        (format t "Time-Elapsed: ~$ minutes~%Processed: ~A~%Time/Processed: ~$ms~%~%" 
+          (/ (- end-time starting-time) 60) 
+          num-processed 
+          (* (/ (- end-time starting-time) num-processed) 1000)))
 	      (cond
 	       ;;Case 1: acc is not big enough,
 	       ;;        append the curr-char on to the list
@@ -149,7 +158,12 @@
 		  (setf acc (append (rest acc) (list curr-char))))))
 	;;Grabs the last input output pair (it misses the last one otherwise)
 	(apply process-func (append func-params (list (butlast (rest acc)) (rest (rest acc)))))
-	(close in)))))
+	(close in)
+  (setf end-time (get-universal-time))
+  (format t "Time-Elapsed: ~$ minutes~%Processed: ~A~%Time/Processed: ~$ms~%~%" 
+    (/ (- end-time starting-time) 60) 
+    num-processed 
+    (* (/ (- end-time starting-time) num-processed) 1000)))))))
       
 ;      (labels
 ;	  ((build-list (curr-char length acc)
