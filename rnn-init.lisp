@@ -51,7 +51,7 @@
 (defun convertToOneHot (outputVec)
 	(let ((max 0)
 		(foundHot nil)
-		(oneHot (make-array *CC* :initial-element 0d0 :element-type 'float))
+		(oneHot (make-array *CC* :initial-element 0.0 :element-type 'float))
 		)
 	(dotimes (i *CC*)
 		(setf i (+ i (random 10)))
@@ -81,7 +81,7 @@
 			)
 
 		(dotimes (sn sl)
-			(setf (aref inputs sn) (make-array *CC* :initial-element 0d0 :element-type 'float))
+			(setf (aref inputs sn) (make-array *CC* :initial-element 0.0 :element-type 'float))
 			)
 
 		(dotimes (i length)
@@ -128,31 +128,29 @@
 			)))
 
 	(dotimes (i seq-len)
-		(setf (aref i-vecks i) (make-array *CC* :initial-element 0d0 :element-type 'float))
-		(setf (aref h-vecks i) (make-array n-h :initial-element 0d0 :element-type 'float))
-		(setf (aref o-vecks i) (make-array *CC* :initial-element 0d0 :element-type 'float))
-		)
+		(setf (aref i-vecks i) (make-array *CC* :initial-element 0.0 :element-type 'float))
+		(setf (aref h-vecks i) (make-array n-h :initial-element 0.0 :element-type 'float))
+		(setf (aref o-vecks i) (make-array *CC* :initial-element 0.0 :element-type 'float))
+	)
 
 	(dotimes (j *CC*)
 		(dotimes (k n-h)
 			(setf (aref i-h-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
-			)
 		)
+	)
 	(dotimes (j n-h)
 		(dotimes (k n-h)
 			(setf (aref h-h-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
-			)
 		)
-	(dotimes (j n-h)
 		(dotimes (k *CC*)
 			(setf (aref h-o-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
-			)
 		)
+	)
 
 	;; return the NN
 	rnn
 	)
-	)
+)
 
 ;;;  ERASE-RNN-OUTPUTs
 ;;; -----------------------------------------------------
@@ -185,7 +183,7 @@
 			(setf (aref h-nodes j) nil)
 			)
 		)
-		)
+	)
 	t))
 
 ;;;  SET-INPUTS
@@ -221,6 +219,18 @@
 (defun sigmoid (x)
 	(/ 1.0 (+ 1 (exp (- x)))))
 
+;; FF-DOT-PRODUCT
+;; -------------------------------
+;; INPUTS: a, the input vector
+;;         b, 
+;; OUTPUTS: their dot produc
+
+(defmacro ff-dot-product (a b)
+	`(loop for x across ,a
+		for y across ,b
+			for z across y
+			summing (* x z)))
+
 ;;;  RNN-FF
 ;;; ----------------------------------------------------------
 ;;;  INPUTS:  RNN, a recurrent neural network
@@ -247,9 +257,9 @@
 	(loop for i from 0 to (1- (rnn-seq-len rnn))
 		do
 		(let* (
-			(i-veck (aref i-vecks i))
-			(h-veck (aref h-vecks i))
-			(o-veck (aref o-vecks i)))
+			(i-veck (svref i-vecks i))
+			(h-veck (svref h-vecks i))
+			(o-veck (svref o-vecks i)))
 		
 		;; For each neuron in the hidden layer
 		(loop for neuron-num from 0 to (1- n-h)
@@ -263,29 +273,32 @@
 
 				(if (= i 0)
 					;; If this is the first of the sequence, just pass normally
-					(sigmoid (let ((dot-prod 0))
-						(loop for j from 0 to (1- *CC*)
-						do
-							(incf dot-prod
-								(* (aref i-veck j)
-									(aref i-h-weights j neuron-num))))
-						dot-prod))
+					(sigmoid (ff-dot-product i-veck i-h-weights))
+						;(let ((dot-prod 0))
+						;(loop for j from 0 to (1- *CC*)
+						;do
+					  ;		(incf dot-prod
+					;			(* (aref i-veck j)
+					;				(aref i-h-weights j neuron-num))))
+					;	dot-prod))
 					;; Otherwise consider the previous hidden layer in the sequence
 					(sigmoid (+ 
-						(let ((dot-prod 0))
-							(loop for j from 0 to (1- n-h)
-							do
-								(incf dot-prod
-									(* (aref (aref h-vecks (- i 1)) j)
-										(aref h-h-weights j neuron-num))))
-							dot-prod)
-						(let ((dot-prod2 0))
-							(loop for j from 0 to (1- *CC*)
-							do
-								(incf dot-prod2
-									(* (aref i-veck j)
-										(aref i-h-weights j neuron-num))))
-							dot-prod2)
+						(ff-dot-product h-vecks h-h-weights)
+						;(let ((dot-prod 0))
+						;	(loop for j from 0 to (1- n-h)
+						;	do
+						;		(incf dot-prod
+						;			(* (aref (aref h-vecks (- i 1)) j)
+						;				(aref h-h-weights j neuron-num))))
+						;	dot-prod)
+						(ff-dot-product i-veck i-h-weights)
+						;(let ((dot-prod2 0))
+						;	(loop for j from 0 to (1- *CC*)
+						;	do
+						;		(incf dot-prod2
+						;			(* (aref i-veck j)
+						;				(aref i-h-weights j neuron-num))))
+						;	dot-prod2)
 						)
 					)
 					)
@@ -350,9 +363,9 @@
 		; 	(let* 
 		; 		(
 		; 			;; The delta gradients
-		; 			(i-h-gradi (make-array n-h :initial-element 0d0 :element-type 'float))
-		; 			(h-h-gradi (make-array n-h :initial-element 0d0 :element-type 'float))
-		; 			(h-o-gradi (make-array *CC* :initial-element 0d0 :element-type 'float))
+		; 			(i-h-gradi (make-array n-h :initial-element 0.0 :element-type 'float))
+		; 			(h-h-gradi (make-array n-h :initial-element 0.0 :element-type 'float))
+		; 			(h-o-gradi (make-array *CC* :initial-element 0.0 :element-type 'float))
 
 		; 			(target-output-n (aref target-outputs n))
 
