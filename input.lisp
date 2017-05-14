@@ -13,7 +13,7 @@
 (defparameter *ASCII-LENGTH* 128)
 (defparameter *ASCII-OFFSET* 32)
 (defparameter *ONE-HOT-LENGTH* 96)
-(defparameter *profile-num* 10000)
+(defparameter *profile-num* 1000)
 
 ;;one hot vector will start at space character (32) and span to the end of ASCII table, 
 ;;then the last index will be line carriage (13)
