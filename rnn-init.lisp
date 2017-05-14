@@ -114,9 +114,9 @@
 		(i-vecks (make-array seq-len))
 		(h-vecks (make-array seq-len))
 		(o-vecks (make-array seq-len))
-		(i-h-weights (make-array (list *CC* n-h)))
-		(h-h-weights (make-array (list n-h n-h)))
-		(h-o-weights (make-array (list n-h *CC*)))
+		(i-h-weights (make-array n-h)) ;(list n-h *CC*)))
+		(h-h-weights (make-array n-h)) ;(list n-h n-h)))
+		(h-o-weights (make-array *CC*));(list *CC* n-h)))
 		(rnn (make-rnn :seq-len seq-len
 			:n-h n-h
 			:i-vecks i-vecks
@@ -127,23 +127,37 @@
 			:h-o-weights h-o-weights
 			)))
 
+	;;initializations of the nodes
 	(dotimes (i seq-len)
-		(setf (aref i-vecks i) (make-array *CC* :initial-element 0.0 :element-type 'float))
-		(setf (aref h-vecks i) (make-array n-h :initial-element 0.0 :element-type 'float))
-		(setf (aref o-vecks i) (make-array *CC* :initial-element 0.0 :element-type 'float))
+		(setf (aref i-vecks i) (make-array *CC* :initial-element 0.0 
+												:element-type 'float))
+		(setf (aref h-vecks i) (make-array n-h :initial-element 0.0 
+												:element-type 'float))
+		(setf (aref o-vecks i) (make-array *CC* :initial-element 0.0 
+												:element-type 'float))
+	)
+	
+	;;initializations of the weights
+	(dotimes (j n-h)
+		(setf (aref i-h-weights j) (make-array *CC* :initial-element 0.0 
+												   :element-type 'float))
+		(setf (aref h-h-weights j) (make-array n-h :initial-element 0.0 
+												   :element-type 'float))
+		
+		(dotimes (k n-h)
+			(setf (aref (aref h-h-weights j) k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
+		)
+		(dotimes (k *CC*)
+			(setf (aref (aref i-h-weights j) k) (+ (random (/ 2 (sqrt *CC*))) (/ -1 (sqrt *CC*))))
+		)
 	)
 
 	(dotimes (j *CC*)
+		(setf (aref h-o-weights j) (make-array n-h :initial-element 0.0 
+												   :element-type 'float))
 		(dotimes (k n-h)
-			(setf (aref i-h-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
-		)
-	)
-	(dotimes (j n-h)
-		(dotimes (k n-h)
-			(setf (aref h-h-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
-		)
-		(dotimes (k *CC*)
-			(setf (aref h-o-weights j k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
+			(setf (aref (aref h-o-weights j) k) (+ (random (/ 2 (sqrt n-h))) (/ -1 (sqrt n-h))))
+			
 		)
 	)
 
@@ -225,11 +239,10 @@
 ;;         b, 
 ;; OUTPUTS: their dot produc
 
-(defmacro ff-dot-product (a b)
+(defmacro dot-product (a b)
 	`(loop for x across ,a
 		for y across ,b
-			for z across y
-			summing (* x z)))
+			summing (* x y)))
 
 ;;;  RNN-FF
 ;;; ----------------------------------------------------------
@@ -265,7 +278,6 @@
 		(loop for neuron-num from 0 to (1- n-h)
 			do
 			;; Compute output value of that neuron 
-
 			(setf (aref h-veck neuron-num)
 				;; sigmoid of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
 				;;  (INPUTS for this neuron are OUTPUTS from neurons 
@@ -273,40 +285,20 @@
 
 				(if (= i 0)
 					;; If this is the first of the sequence, just pass normally
-					(sigmoid (ff-dot-product i-veck i-h-weights))
-						;(let ((dot-prod 0))
-						;(loop for j from 0 to (1- *CC*)
-						;do
-					  ;		(incf dot-prod
-					;			(* (aref i-veck j)
-					;				(aref i-h-weights j neuron-num))))
-					;	dot-prod))
+					(sigmoid (dot-product i-veck (aref i-h-weights neuron-num)))
 					;; Otherwise consider the previous hidden layer in the sequence
-					(sigmoid (+ 
-						(ff-dot-product h-vecks h-h-weights)
-						;(let ((dot-prod 0))
-						;	(loop for j from 0 to (1- n-h)
-						;	do
-						;		(incf dot-prod
-						;			(* (aref (aref h-vecks (- i 1)) j)
-						;				(aref h-h-weights j neuron-num))))
-						;	dot-prod)
-						(ff-dot-product i-veck i-h-weights)
-						;(let ((dot-prod2 0))
-						;	(loop for j from 0 to (1- *CC*)
-						;	do
-						;		(incf dot-prod2
-						;			(* (aref i-veck j)
-						;				(aref i-h-weights j neuron-num))))
-						;	dot-prod2)
+					(sigmoid 
+						(+
+							(dot-product (aref h-vecks (- i 1)) (aref h-h-weights neuron-num))
+							(dot-product i-veck (aref i-h-weights neuron-num))
 						)
-					)
 					)
 				)
 			)
+		)
 
-
-		;; For each neuron in the output layer
+		
+		; ;; For each neuron in the output layer
 		(loop for neuron-num from 0 to (1- *CC*)
 			do
 			;; Compute output value of that neuron 
@@ -314,18 +306,12 @@
 				;; sigmoid of the DOT-PRODUCT of WEIGHTS and INPUT VALUES
 				;;  (INPUTS for this neuron are OUTPUTS from neurons 
 				;;     in previous layer)
-				(sigmoid (let ((dot-prod 0))
-					(loop for j from 0 to (1- n-h)
-					do
-						(incf dot-prod
-							(* (aref h-veck j)
-								(aref h-o-weights j neuron-num))))
-					dot-prod)))
+				(dot-product h-veck (aref h-o-weights neuron-num))
 			)
 		)
-		)
 	)
-	)
+	))
+)
 
 (defun train-rnn-one (rnn alpha inputs target-outputs)
 	; (format T "~A" rnn)
@@ -357,7 +343,7 @@
 
 		((n-h (rnn-n-h rnn)))
 
-		;; For each input in the sequence
+		; ;; For each input in the sequence
 		; (dotimes (n (rnn-seq-len rnn))
 		; 	;; Back prop algorithm...
 		; 	(let* 
@@ -483,11 +469,11 @@
 		; 		; (format t "~A~%" h-o-gradi)
 		; 		)
 		; 	)
-		;; return the RNN
+		; ; return the RNN
 		; (format T "~%-------- After backprop --------~%")
 		; (format T "~A" rnn)
 
-		;(format t "~A~%" (babble rnn 10))
+		; (format t "~A~%" (babble rnn 10))
 		; rnn
 		)
 	)
