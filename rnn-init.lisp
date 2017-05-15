@@ -51,19 +51,44 @@
 (defun convertToOneHot (outputVec)
 	(let ((max 0)
 		(foundHot nil)
-		(oneHot (make-array *CC* :initial-element 0.0 :element-type 'float))
+		(oneHot (make-array *CC* :initial-element 0))
 		)
 	(dotimes (i *CC*)
-		(setf i (+ i (random 10)))
-		(when (and (< i *CC*) (> (aref outputVec i) max)) (setf max (aref outputVec i)))
+		;(setf i (+ i (random 3)))
+		(when (and (< i *CC*) (> (svref outputVec i) max)) (setf max (svref outputVec i)))
 		)
 
 	(dotimes (i *CC*)
-		(when (or foundHot (not (= (aref outputVec i) max)))
-			(setf (aref oneHot i) 0)
+		(when (or foundHot (not (= (svref outputVec i) max)))
+			(setf (svref oneHot i) 0)
 			)
-		(when (and (= (aref outputVec i) max) (not foundHot))
-			(setf (aref oneHot i) 1)
+		(when (and (= (svref outputVec i) max) (not foundHot))
+			(setf (svref oneHot i) 1)
+			(setf foundHot T)
+			)
+		)
+	;(format T "~%~A~%" outputVec)
+
+	oneHot
+	)
+	)
+
+(defun convertToRandOneHot (outputVec rand)
+	(let ((max 0)
+		(foundHot nil)
+		(oneHot (make-array *CC* :initial-element 0))
+		)
+	(dotimes (i *CC*)
+		(setf i (+ i (random rand)))
+		(when (and (< i *CC*) (> (svref outputVec i) max)) (setf max (svref outputVec i)))
+		)
+
+	(dotimes (i *CC*)
+		(when (or foundHot (not (= (svref outputVec i) max)))
+			(setf (svref oneHot i) 0)
+			)
+		(when (and (= (svref outputVec i) max) (not foundHot))
+			(setf (svref oneHot i) 1)
 			(setf foundHot T)
 			)
 		)
@@ -81,22 +106,75 @@
 			)
 
 		(dotimes (sn sl)
-			(setf (aref inputs sn) (make-array *CC* :initial-element 0.0 :element-type 'float))
+			(setf (svref inputs sn) (make-array *CC* :initial-element 0))
+			(let (
+				(index (random *CC*))
+				)
+			(dotimes (i *CC*)
+				(when (= index i) (setf (svref (svref inputs sn) i) 1))
+				)
+			)
 			)
 
 		(dotimes (i length)
 			(rnn-ff rnn inputs)
+			
 			(dotimes (sn sl)
+				;(format T "~%~A~%" (tmax (svref (rnn-o-vecks rnn) sn)))
 				(let (
-					(ohv-out (convertToOneHot (aref (rnn-o-vecks rnn) sn)))
+					(ohv-out (convertToOneHot (svref (rnn-o-vecks rnn) sn)))
+					)
+				; Print it
+				; (format T "~A" ohv-out)
+				(when (= sn (- sl 1)) (format T "~A" (one-hot-vec-char ohv-out)))
+				; Set to input
+				(setf (svref inputs sn) ohv-out)
+				)
+				)
+			)
+		)
+	)
+
+(defun randBabble (rnn length rand)
+	(let*
+		(
+			(sl (rnn-seq-len rnn))
+			(inputs (make-array sl))
+			)
+
+		(dotimes (sn sl)
+			(setf (svref inputs sn) (make-array *CC* :initial-element (random 2)))
+			)
+
+		(dotimes (i length)
+			;(format t "~%~A~%" inputs)
+			(rnn-ff rnn inputs)
+			
+			(dotimes (sn sl)
+				;(format T "~%~A~%" (tmax (svref (rnn-o-vecks rnn) sn)))
+				(let (
+					(ohv-out (convertToRandOneHot (svref (rnn-o-vecks rnn) sn) rand))
 					)
 				; Print it
 				; (format T "~A" ohv-out)
 				(format T "~A" (one-hot-vec-char ohv-out))
 				; Set to input
-				(setf (aref inputs sn) ohv-out)
+				(setf (svref inputs sn) ohv-out)
 				)
 				)
+			)
+		)
+	)
+
+(defun softMax! (vec len)
+	;; Softmax
+	(let ((total 0))
+		(dotimes (neuron-num len)
+			(setf total (+ total (svref vec neuron-num)))
+			)
+
+		(dotimes (neuron-num len)
+			(setf (svref vec neuron-num) (/ (svref vec neuron-num) total))
 			)
 		)
 	)
@@ -318,27 +396,26 @@
 
 (defun train-rnn-one (rnn alpha inputs target-outputs)
 	; (format T "~A" rnn)
+	(format t "~%Inp: ")
+	(dotimes (i (rnn-seq-len rnn))
+		(format t "~A" (one-hot-vec-char (aref inputs i)))
+		)
 
-	; (format t "~%Input: ")
-	; (dotimes (i (rnn-seq-len rnn))
-	; 	(format t "~A" (one-hot-vec-char (aref inputs i)))
-	; 	)
-
-	; (format t "~%Goal: ")
-	; (dotimes (i (rnn-seq-len rnn))
-	; 	(format t "~A" (one-hot-vec-char (aref target-outputs i)))
-	; 	)
+	(format t "~%Goal: ")
+	(dotimes (i (rnn-seq-len rnn))
+		(format t "~A" (one-hot-vec-char (aref target-outputs i)))
+		)
 
 	;FEED FORWARD
 	(rnn-ff rnn inputs)
 
-	; (let ((output (rnn-o-vecks rnn)))
-	; 	(format t "~%Our Guess: ")
-	; 	(dotimes (i (rnn-seq-len rnn))
-	; 		;(format t "~A~%" (aref output i))
-	; 		(format t "~A" (one-hot-vec-char (convertToOneHot (aref output i))))
-	; 		)
-	; 	)
+	(let ((output (rnn-o-vecks rnn)))
+		(format t "~%Ours: ")
+		(dotimes (i (rnn-seq-len rnn))
+			;(format t "~A~%" (aref output i))
+			(format t "~A" (one-hot-vec-char (convertToOneHot (aref output i))))
+			)
+		)
 	; (format T "~%-------- After Forward Pass --------~%")
 	; (format T "~A" rnn)
 
@@ -356,6 +433,7 @@
 		; 	(i-h-weights (make-array n-h)) ;(list n-h *CC*)))
 		   ; (h-h-weights (make-array n-h)) ;(list n-h n-h)))
 		   ; (h-o-weights (make-array *CC*));(list *CC* n-h)))
+
 			(let
 				((target-output-n (aref target-outputs n))
 				 (i-veck (aref (rnn-i-vecks rnn) n))
@@ -365,7 +443,6 @@
 				 (h-h-gradi (make-array n-h :initial-element 0.0 :element-type 'float))
 		         (h-o-gradi (make-array *CC* :initial-element 0.0 :element-type 'float))
 				)
-
 				;h-o
 				(loop for neuron-num from 0 to (1- *CC*)
 					do
@@ -380,9 +457,6 @@
 					  )
 					)
 				)
-
-
-
 				; i-h
 				(loop for neuron-num from 0 to (1- n-h)
 					do
@@ -400,23 +474,32 @@
 						)
 					)
 				)
-				
 				;h-h
 				;i-h
 				(loop for hn from (1- n) downto 0
 					do
+
 					(let* 
 						((hn-veck (aref (rnn-h-vecks rnn) hn)))
+						
 						;h-h
 						(loop for neuron-num from 0 to (1- n-h)
 							do
 							(let* 
 								((my-output (aref hn-veck neuron-num))
-								(sum (dot-product (aref h-o-weights neuron-num) h-o-gradi)))
+								;(sum (dot-product (aref h-o-weights neuron-num) h-o-gradi)))
+								(sum 
+									(let ((dotty 0))
+										(loop for j from 0 to (1- *CC*)
+											do
+											(incf dotty (* (aref (aref h-o-weights j) neuron-num)
+												(svref h-o-gradi j))))
+								dotty)))
 								(incf (aref h-h-gradi neuron-num)
 									(update-gradiant my-output sum (/ hn n)))
 							)
 						)
+
 						;i-h
 						(loop for neuron-num from 0 to (1- n-h)
 							do
@@ -435,41 +518,39 @@
 		 		;; For each neuron N_i in that layer...
 		 		(loop for i from 0 to (1- n-h)
 		 			do
+
 		 			(let (
 		 				(i-h-weight (aref i-h-weights i))
 		 				(h-h-weight (aref h-h-weights i))
-		 				(i-veck-val (aref i-veck i))
 		 				(h-veck-val (aref h-veck i)))
-
 			 			(loop for j from 0 to (1- *CC*)
 			 				do
 			 				(incf (aref i-h-weight j) 
 			 					(* alpha 
-		 						i-veck-val
+		 						(aref i-veck j)
 								(aref i-h-gradi i)))
-			 			)
 
-			 			(loop for j from 0 to (1- n-h)
-			 				do
-			 				(incf (aref h-h-weight j) 
+			 				(incf (aref (aref h-o-weights j) i) 
 			 					(* alpha 
 		 						h-veck-val
-								(aref h-h-gradi j)))
+								(aref h-o-gradi j)))
 			 			)
-			 			(loop for j from 0 to (1- *CC*)
+
+
+			 			(loop for k from 0 to (1- n-h)
 			 				do
-				 			(incf (aref (aref h-o-weights j) i) 
-				 					(* alpha 
-			 						h-veck-val
-									(aref h-o-gradi j)))
-				 		)
+			 				(incf (aref h-h-weight k) 
+			 					(* alpha 
+		 						h-veck-val
+								(aref h-h-gradi k)))
+			 			)
 		 			)
 		 		)
-
 			)
 		)
 	)
-	rnn
+
+	(format t "~%----------------")
 )
 
 
