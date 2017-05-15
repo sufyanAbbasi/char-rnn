@@ -353,13 +353,15 @@
 
 		(loop for n from 0 to (1- seq-len)
 			do
-			
+		; 	(i-h-weights (make-array n-h)) ;(list n-h *CC*)))
+		   ; (h-h-weights (make-array n-h)) ;(list n-h n-h)))
+		   ; (h-o-weights (make-array *CC*));(list *CC* n-h)))
 			(let
 				((target-output-n (aref target-outputs n))
 				 (i-veck (aref (rnn-i-vecks rnn) n))
 				 (h-veck (aref (rnn-h-vecks rnn) n))
 				 (o-veck (aref (rnn-o-vecks rnn) n))
-				 (i-h-gradi (make-array *CC* :initial-element 0.0 :element-type 'float))
+				 (i-h-gradi (make-array n-h :initial-element 0.0 :element-type 'float))
 				 (h-h-gradi (make-array n-h :initial-element 0.0 :element-type 'float))
 		         (h-o-gradi (make-array *CC* :initial-element 0.0 :element-type 'float))
 				)
@@ -379,17 +381,23 @@
 					)
 				)
 
+
+
 				; i-h
 				(loop for neuron-num from 0 to (1- n-h)
 					do
 					(let
 						((my-output (aref h-veck neuron-num))
-						 (sum (dot-product (aref h-o-weights neuron-num) h-o-gradi))
+						(sum 
+							(let ((dotty 0))
+								(loop for j from 0 to (1- *CC*)
+									do
+									(incf dotty (* (aref (aref h-o-weights j) neuron-num)
+										(svref h-o-gradi j))))
+								dotty)))
+						(incf (svref i-h-gradi neuron-num)
+							(update-gradiant my-output sum 1)
 						)
-
-					  (incf (aref i-h-gradi neuron-num)
-		 				(update-gradiant my-output sum 1)
-		 			  )
 					)
 				)
 				
