@@ -290,15 +290,17 @@
                 (let* (
                     (target-output (svref target-output-n neuron-num))
                     (my-output (svref o-veck neuron-num))
+                    (my-output-frac (/ (+ 1 (svref o-veck neuron-num)) 2))
                     (diffy (- target-output my-output)))
 
                 (setf (svref h-o-gradi neuron-num)
-                    (* (abs (* my-output (- 1 my-output))) diffy))))
+                    (* my-output-frac (- 1 my-output-frac) diffy))))
 
             ;; Determine gradients from Hidden to Inputs
             (dotimes (neuron-num n-h)
                 (let* (
                     (my-output (svref h-veck neuron-num))
+                    (my-output-frac (/ (+ 1 (svref h-veck neuron-num)) 2))
                     (sum (let ((dotty 0))
                         (dotimes (j *CC*)
                             (incf dotty (* (aref h-o-weights neuron-num j)
@@ -306,7 +308,7 @@
                         dotty)))
 
                 (incf (svref i-h-gradi neuron-num)
-                    (* (abs (* my-output (- 1 my-output))) sum))
+                    (* my-output-frac (- 1 my-output-frac) sum))
                 )
                 )
 
@@ -320,13 +322,14 @@
                     (dotimes (neuron-num n-h)
                         (let* (
                             (my-output (svref hn-veck neuron-num))
+                            (my-output-frac (/ (+ 1 (svref hn-veck neuron-num)) 2))
                             (sum (let ((dotty 0))
                                 (dotimes (j *CC*)
                                     (incf dotty (* (aref h-o-weights neuron-num j)
                                         (svref h-o-gradi j))))
                                 dotty)))
                         (incf (svref h-h-gradi neuron-num)
-                            (* (/ hn n) (* (abs (* my-output (- 1 my-output))) sum)))))
+                            (* (/ hn n) (* my-output-frac (- 1 my-output-frac) sum)))))
 
                     )
                 )
@@ -398,7 +401,7 @@
     ;Return the one hot vector
     oneHot
     )
-    )
+)
 
 ;;;  TO-RAND-ONE-HOT
 ;;; ----------------------------------------------------------
@@ -409,7 +412,7 @@
 ;;;  OUTPUT:  a vector of size *CC* with the highest value set to
 ;;;              1 and the rest set to zero, however the highest
 ;;;           value is partially randomly chosen
-(defun to-rand-one-hot (outputVec rand)
+(defun to-rand-one-hot (vec rand)
     (let (;Max value found
         (max 0)
         ;Flag that the max was found
@@ -421,7 +424,7 @@
     (dotimes (i *CC*)
         ;;Randomly scan for the next value in the vector
         (setf i (+ i (random rand)))
-        (when (and (< i *CC*) (> (svref outputVec i) max)) (setf max (svref outputVec i)))
+        (when (and (< i *CC*) (> (svref vec i) max)) (setf max (svref vec i)))
         )
 
 
@@ -440,7 +443,7 @@
     ;Return the one hot vector
     oneHot
     )
-    )
+)
 
 
 ;;;  BABBLE
@@ -469,7 +472,7 @@
             ;;Feed forward
             (rnn-ff rnn inputs)
             ;; Print the last output character
-            (format T "~A" (to-one-hot (svref (rnn-o-vecks rnn) (- sl 1))))
+            (format T "~A" (one-hot-vec-char (to-one-hot (svref (rnn-o-vecks rnn) (- sl 1)))))
             ; Set our output to be the new input
             (setf inputs (rnn-o-vecks rnn))
         )
@@ -508,7 +511,7 @@
             ;;Feed forward
             (rnn-ff rnn inputs)
             ;; Print the last output character
-            (format T "~A" (to-rand-one-hot (svref (rnn-o-vecks rnn) (- sl 1)) rand))
+            (format T "~A" (one-hot-vec-char (to-rand-one-hot (svref (rnn-o-vecks rnn) (- sl 1)) rand)))
             ; Set our output to be the new input
             (setf inputs (rnn-o-vecks rnn))
         )
