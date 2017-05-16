@@ -87,9 +87,9 @@
 
     ;; Initialize the input, hidden, and output nodes to 0
     (dotimes (i seq-len)
-        (setf (svref i-vecks i) (make-array *CC* :initial-element 0 :element-type 'float))
-        (setf (svref h-vecks i) (make-array n-h :initial-element 0 :element-type 'float))
-        (setf (svref o-vecks i) (make-array *CC* :initial-element 0 :element-type 'float))
+        (setf (svref i-vecks i) (make-array *CC* :initial-element 0 ))
+        (setf (svref h-vecks i) (make-array n-h :initial-element 0 ))
+        (setf (svref o-vecks i) (make-array *CC* :initial-element 0 ))
         )
 
     ;; Randomly initialize the input to hidden weights relative to *CC*
@@ -127,6 +127,7 @@
 ;;;   in all networks in the sequence
 
 (defun rnn-ff (rnn input-vecks)
+    (declare (optimize speed))
     ;; Set the input vector
     (setf (rnn-i-vecks rnn) input-vecks)
 
@@ -142,7 +143,7 @@
 
     ;; For each input in the sequence
     (dotimes (i (rnn-seq-len rnn))
-
+        (declare (optimize speed))
         ;; Get the input, hidden, and output vector of this network in the sequence
         (let ((i-veck (svref i-vecks i))
             (h-veck (svref h-vecks i))
@@ -150,7 +151,7 @@
 
         ;; For each neuron in the hidden layer
         (dotimes (neuron-num n-h)
-
+            (declare (optimize speed))
             ;; Compute output value of that neuron 
             (setf (svref h-veck neuron-num)
 
@@ -162,6 +163,7 @@
                     (tanh 
                         (let ((dot-prod 0))
                             (dotimes (j *CC*)
+                                (declare (optimize speed))
                                 (incf dot-prod
                                     (* (svref i-veck j)
                                         (aref i-h-weights j neuron-num))))
@@ -177,12 +179,14 @@
                         (+ 
                             (let ((dot-prod 0))
                                 (dotimes (j n-h)
+                                    (declare (optimize speed))
                                     (incf dot-prod
                                         (* (svref (svref h-vecks (- i 1)) j)
                                             (aref h-h-weights j neuron-num))))
                                 dot-prod)
                             (let ((dot-prod2 0))
                                 (dotimes (j *CC*)
+                                    (declare (optimize speed))
                                     (incf dot-prod2
                                         (* (svref i-veck j)
                                             (aref i-h-weights j neuron-num))))
@@ -202,6 +206,7 @@
 
                 (tanh (let ((dot-prod 0))
                     (dotimes (j n-h)
+                        (declare (optimize speed))
                         (incf dot-prod
                             (* (svref h-veck j)
                                 (aref h-o-weights j neuron-num))))
@@ -234,34 +239,34 @@
 ;;;                    adjusts weights of the rnn based on the 
 ;;;                    expected target-outputs and the delta rule
 (defun train-rnn-one (rnn alpha inputs target-outputs)
-
+    (declare (optimize speed))
     ; Print the input chars and expected output chars
-    (when T
-        (format t "~%Input: ")
-        (dotimes (i (rnn-seq-len rnn))
-            (format t "~A" (one-hot-vec-char (svref inputs i)))
-            )
+    ; (when T
+    ;     (format t "~%Input: ")
+    ;     (dotimes (i (rnn-seq-len rnn))
+    ;         (format t "~A" (one-hot-vec-char (svref inputs i)))
+    ;         )
 
-        (format t "~%Goal: ")
-        (dotimes (i (rnn-seq-len rnn))
-            (format t "~A" (one-hot-vec-char (svref target-outputs i)))
-            )
-        )
+    ;     (format t "~%Goal: ")
+    ;     (dotimes (i (rnn-seq-len rnn))
+    ;         (format t "~A" (one-hot-vec-char (svref target-outputs i)))
+    ;         )
+    ;     )
 
     ;FEED FORWARD
     (rnn-ff rnn inputs)
 
 
     ; Print the network's guess
-    (when T
-        (let ((output (rnn-o-vecks rnn)))
-            (format t "~%Ours: ")
-            (dotimes (i (rnn-seq-len rnn))
-                ;(format t "~A~%" (svref output i))
-                (format t "~A" (one-hot-vec-char (to-one-hot (svref output i))))
-                )
-            )
-        )
+    ; (when T
+    ;     (let ((output (rnn-o-vecks rnn)))
+    ;         (format t "~%Ours: ")
+    ;         (dotimes (i (rnn-seq-len rnn))
+    ;             ;(format t "~A~%" (svref output i))
+    ;             (format t "~A" (one-hot-vec-char (to-one-hot (svref output i))))
+    ;             )
+    ;         )
+    ;     )
 
     ;BACK PROPOGATION
     (let* 
@@ -269,6 +274,7 @@
 
         ;; For each input in the sequence
         (dotimes (n (rnn-seq-len rnn))
+            (declare (optimize speed))
             (let* (;; The delta gradients
                 (i-h-gradi (rnn-i-h-gradi rnn))
                 (h-h-gradi (rnn-h-h-gradi rnn))
@@ -287,49 +293,50 @@
             (reset-vector h-o-gradi)
             ;; Determine gradients from Output to Hidden
             (dotimes (neuron-num *CC*)
+                (declare (optimize speed))
                 (let* (
                     (target-output (svref target-output-n neuron-num))
                     (my-output (svref o-veck neuron-num))
-                    (my-output-frac (/ (+ 1 (svref o-veck neuron-num)) 2))
                     (diffy (- target-output my-output)))
 
                 (setf (svref h-o-gradi neuron-num)
-                    (* my-output-frac (- 1 my-output-frac) diffy))))
+                    (* (abs (* my-output (- 1 my-output))) diffy))))
 
             ;; Determine gradients from Hidden to Inputs
             (dotimes (neuron-num n-h)
                 (let* (
                     (my-output (svref h-veck neuron-num))
-                    (my-output-frac (/ (+ 1 (svref h-veck neuron-num)) 2))
                     (sum (let ((dotty 0))
                         (dotimes (j *CC*)
+                            (declare (optimize speed))
                             (incf dotty (* (aref h-o-weights neuron-num j)
                                 (svref h-o-gradi j))))
                         dotty)))
 
                 (incf (svref i-h-gradi neuron-num)
-                    (* my-output-frac (- 1 my-output-frac) sum))
+                    (* (abs (* my-output (- 1 my-output))) sum))
                 )
                 )
 
 
             ;; Determine gradients between hidden layers
-            (loop for hn from (1- n) downto 0
-                do
+            (dotimes (hnn n)
                 (let*
-                    ((hn-veck (svref (rnn-h-vecks rnn) hn)))
+                    ((hn (- (- n hnn) 1))
+                        (hn-veck (svref (rnn-h-vecks rnn) hn)))
 
                     (dotimes (neuron-num n-h)
+                        (declare (optimize speed))
                         (let* (
                             (my-output (svref hn-veck neuron-num))
-                            (my-output-frac (/ (+ 1 (svref hn-veck neuron-num)) 2))
                             (sum (let ((dotty 0))
                                 (dotimes (j *CC*)
+                                    (declare (optimize speed))
                                     (incf dotty (* (aref h-o-weights neuron-num j)
                                         (svref h-o-gradi j))))
                                 dotty)))
                         (incf (svref h-h-gradi neuron-num)
-                            (* (/ hn n) (* my-output-frac (- 1 my-output-frac) sum)))))
+                            (* (/ hn n) (* (abs (* my-output (- 1 my-output))) sum)))))
 
                     )
                 )
@@ -339,6 +346,7 @@
             ;; Update input weights
             (dotimes (i *CC*)
                 (dotimes (j n-h)
+                    (declare (optimize speed))
                     (incf (aref i-h-weights i j)
                         (* alpha 
                             (svref i-veck i) 
@@ -347,6 +355,7 @@
             ;; Update hidden weights
             (dotimes (i n-h)
                 (dotimes (j n-h)
+                    (declare (optimize speed))
                     (incf (aref h-h-weights i j)
                         (* alpha 
                             (svref h-veck i) 
@@ -355,7 +364,7 @@
             ;; Update output weights
             (dotimes (i n-h)
                 (dotimes (j *CC*)
-
+                    (declare (optimize speed))
                     (incf (aref h-o-weights i j)
                         (* alpha 
                             (svref h-veck i) 
@@ -363,7 +372,7 @@
 
             )
             )
-        (when T (format T "~%----------------~%"))
+        ; (when T (format T "~%----------------~%"))
         )
     )
 
@@ -401,7 +410,7 @@
     ;Return the one hot vector
     oneHot
     )
-)
+    )
 
 ;;;  TO-RAND-ONE-HOT
 ;;; ----------------------------------------------------------
@@ -412,7 +421,7 @@
 ;;;  OUTPUT:  a vector of size *CC* with the highest value set to
 ;;;              1 and the rest set to zero, however the highest
 ;;;           value is partially randomly chosen
-(defun to-rand-one-hot (vec rand)
+(defun to-rand-one-hot (outputVec rand)
     (let (;Max value found
         (max 0)
         ;Flag that the max was found
@@ -424,7 +433,7 @@
     (dotimes (i *CC*)
         ;;Randomly scan for the next value in the vector
         (setf i (+ i (random rand)))
-        (when (and (< i *CC*) (> (svref vec i) max)) (setf max (svref vec i)))
+        (when (and (< i *CC*) (> (svref outputVec i) max)) (setf max (svref outputVec i)))
         )
 
 
@@ -443,7 +452,7 @@
     ;Return the one hot vector
     oneHot
     )
-)
+    )
 
 
 ;;;  BABBLE
@@ -472,7 +481,7 @@
             ;;Feed forward
             (rnn-ff rnn inputs)
             ;; Print the last output character
-            (format T "~A" (one-hot-vec-char (to-one-hot (svref (rnn-o-vecks rnn) (- sl 1)))))
+            (format T "~A" (to-one-hot (svref (rnn-o-vecks rnn) (- sl 1))))
             ; Set our output to be the new input
             (setf inputs (rnn-o-vecks rnn))
         )
@@ -511,7 +520,7 @@
             ;;Feed forward
             (rnn-ff rnn inputs)
             ;; Print the last output character
-            (format T "~A" (one-hot-vec-char (to-rand-one-hot (svref (rnn-o-vecks rnn) (- sl 1)) rand)))
+            (format T "~A" (to-rand-one-hot (svref (rnn-o-vecks rnn) (- sl 1)) rand))
             ; Set our output to be the new input
             (setf inputs (rnn-o-vecks rnn))
         )
