@@ -233,10 +233,10 @@
 ;;;  SIDE-EFFECT:  Feeds Forward (rnn-ff) the inputs into the rnn, then
 ;;;                    adjusts weights of the rnn based on the 
 ;;;                    expected target-outputs and the delta rule
-(defun train-rnn-one (rnn alpha inputs target-outputs)
+(defun train-rnn-one (rnn alpha debug inputs target-outputs)
 
     ; Print the input chars and expected output chars
-    (when T
+    (when debug
         (format t "~%Input: ")
         (dotimes (i (rnn-seq-len rnn))
             (format t "~A" (one-hot-vec-char (svref inputs i)))
@@ -253,7 +253,7 @@
 
 
     ; Print the network's guess
-    (when T
+    (when debug
         (let ((output (rnn-o-vecks rnn)))
             (format t "~%Ours: ")
             (dotimes (i (rnn-seq-len rnn))
@@ -363,7 +363,7 @@
 
             )
             )
-        (when T (format T "~%----------------~%"))
+        (when debug (format T "~%----------------~%"))
         )
     )
 

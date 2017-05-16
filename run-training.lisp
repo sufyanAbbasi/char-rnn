@@ -12,4 +12,4 @@
   (defparameter ar5 (make-array 3 :initial-contents '(0 0 1)))
   (defparameter ar (make-array 5 :initial-contents (list ar1 ar2 ar3 ar4 ar5)))
 ; (generate-inputs-from-text "training_data/shakespeare.txt" 100)
-(train-rnn-text "training_data/rabbit.txt" #'train-rnn-one bob .01)
+(train-rnn-text "training_data/rabbit.txt" #'train-rnn-one bob .01 t)

@@ -3,7 +3,7 @@
 ;;==============================
 
 (defparameter *list-o-files*
-    (list "input" "rnn" "run-training"))
+    (list "rnn" "input" "run-training"))
 
 (defun make
   ()
