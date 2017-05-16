@@ -1,4 +1,4 @@
-(defparameter bob (init-rnn 5 50))
+(defparameter bob (init-rnn 5 400))
   (defparameter iar1 (make-array 3 :initial-contents '(.5 .5 .5)))
   (defparameter iar2 (make-array 3 :initial-contents '(.5 .5 .5)))
   (defparameter iar3 (make-array 3 :initial-contents '(.5 .5 .5)))
@@ -12,4 +12,4 @@
   (defparameter ar5 (make-array 3 :initial-contents '(0 0 1)))
   (defparameter ar (make-array 5 :initial-contents (list ar1 ar2 ar3 ar4 ar5)))
 ; (generate-inputs-from-text "training_data/shakespeare.txt" 100)
-(train-rnn-text "training_data/shakespear.txt" #'train-rnn-one bob .0001)
+(train-rnn-text "training_data/cs.txt" #'train-rnn-one bob .01)
