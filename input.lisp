@@ -10,7 +10,7 @@
 (defconstant *ASCII-LENGTH* 128)
 (defconstant *ASCII-OFFSET* 32)
 (defconstant *ONE-HOT-LENGTH* 96)
-(defconstant *profile-num* 1000)
+(defconstant *profile-num* 100)
 
 ;;one hot vector will start at space character (32) and span to the end of ASCII table, 
 ;;then the last index will be line carriage (13)
@@ -180,6 +180,7 @@
     num-processed 
     (* (/ (- end-time starting-time) num-processed) 1000))
   (when print-func
+    (format "~%Final Output:")
     (apply print-func func-params))
   ))))
       
@@ -213,3 +214,9 @@
 
 (defmacro train-rnn-text (url train-func rnn alpha debug)
   `(process-chars ,url (rnn-seq-len ,rnn) #'train-rnn-input #'print-curr-rnn ,train-func ,rnn ,alpha ,debug))
+
+(defun train-to-speak (url seq-len num-hidden alpha)
+  (train-rnn-text url #'train-rnn-one (init-rnn seq-len num-hidden) alpha nil))
+
+(defun watch-training (url seq-len num-hidden alpha)
+  (train-rnn-text url #'train-rnn-one (init-rnn seq-len num-hidden) alpha t))
