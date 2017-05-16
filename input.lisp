@@ -8,8 +8,8 @@
 ;; are handled appropriately/efficiently by the compiler. 
 
 (defconstant *ASCII-LENGTH* 128)
-(defconstant *ASCII-OFFSET* 65)
-(defconstant *ONE-HOT-LENGTH* 64)
+(defconstant *ASCII-OFFSET* 32)
+(defconstant *ONE-HOT-LENGTH* 96)
 (defconstant *profile-num* 100)
 (defconstant *default-char* #\_)
 
@@ -44,18 +44,16 @@
    ((= i (char-code #\Return))
     (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (1- *ONE-HOT-LENGTH*)))
     (setf (gethash (1- *ONE-HOT-LENGTH*) *one-hot-index*) #\Return))
-   ;;ASCII 32: map space to the first index 
-   ((= i (char-code #\Space))
-    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec 0))
-    (setf (gethash 0 *one-hot-index*) #\Space))
-   ;;ASCII 0 - 64: map control characters, punctuation, and DEL to a #
+   ;;ASCII 0 - 31: map control characters and DEL to a #
    ((or (< i *ASCII-OFFSET*) (= i (1- *ASCII-LENGTH*)))
     (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- (char-code *default-char*) *ASCII-OFFSET*)))
     (setf (gethash (- (char-code *default-char*) *ASCII-OFFSET*) *one-hot-index*) *default-char*))
-   ;;ASCII 65 - 127: map character to its offsetted index
+   ;;ASCII 32 - 127: map character to its offsetted index
    (t 
-    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (1+ (- i *ASCII-OFFSET*))))
-    (setf (gethash (1+ (- i *ASCII-OFFSET*)) *one-hot-index*) (code-char i)))))
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- i *ASCII-OFFSET*)))
+    (setf (gethash (- i *ASCII-OFFSET*) *one-hot-index*) (code-char i))))
+  (format t "~A : ~A~%" (code-char i) (one-hot-vec-char (char-one-hot-vec (code-char i))))
+  )
 
 
 ;;ASCII characters 32 (space) -> 90 (Z) + line_carriage (13)
@@ -102,17 +100,17 @@
   (loop for curr-char = (read-char in nil)
       while curr-char do 
       (when (= (mod (incf num-processed) *profile-num*) 0)
-       ; (setf end-time (get-universal-time))
-       ;  (format t "Time-Elapsed: ~$ minutes~%Processed: ~A~%Time/Processed: ~$ms~%~%" 
-       ;    (/ (- end-time starting-time) 60) 
-       ;    num-processed 
-       ;    (* (/ (- end-time starting-time) num-processed) 1000))
         (format t ".")
         (incf num-dots)
         (when (and (= (mod num-dots 10) 0) (> num-dots 0) print-func)
-          (format t "~%")
+          (format t "~%Output: ")
           (apply print-func func-params)
           (format t "~%")
+          (setf end-time (get-universal-time))
+          (format t "Time-Elapsed: ~$ minutes~%Processed: ~A~%Time/Processed: ~$ms~%~%" 
+          (/ (- end-time starting-time) 60) 
+          num-processed 
+          (* (/ (- end-time starting-time) num-processed) 1000))
           (format t "Training")
         )
       )
@@ -183,7 +181,7 @@
 ;; SIDE EFFECT: runs the given function every 10 dots
 
 (defun print-curr-rnn (train-rnn-func rnn alpha verbose)
-  (babble rnn 50))
+  (babble rnn 25))
 
 ;; TRAIN-RNN-TEXT
 ;;---------------------
