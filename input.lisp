@@ -8,9 +8,10 @@
 ;; are handled appropriately/efficiently by the compiler. 
 
 (defconstant *ASCII-LENGTH* 128)
-(defconstant *ASCII-OFFSET* 32)
-(defconstant *ONE-HOT-LENGTH* 96)
+(defconstant *ASCII-OFFSET* 65)
+(defconstant *ONE-HOT-LENGTH* 64)
 (defconstant *profile-num* 100)
+(defconstant *default-char* #\_)
 
 ;;one hot vector will start at space character (32) and span to the end of ASCII table, 
 ;;then the last index will be line carriage (13)
@@ -42,15 +43,19 @@
    ;;ASCII 13: map line carriage to the last index
    ((= i (char-code #\Return))
     (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (1- *ONE-HOT-LENGTH*)))
-    (setf (gethash (1- *ONE-HOT-LENGTH*) *one-hot-index*) #\Return)) 
-   ;;ASCII 0 - 31: map control characters and DEL to a #
+    (setf (gethash (1- *ONE-HOT-LENGTH*) *one-hot-index*) #\Return))
+   ;;ASCII 32: map space to the first index 
+   ((= i (char-code #\Space))
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec 0))
+    (setf (gethash 0 *one-hot-index*) #\Space))
+   ;;ASCII 0 - 64: map control characters, punctuation, and DEL to a #
    ((or (< i *ASCII-OFFSET*) (= i (1- *ASCII-LENGTH*)))
-    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- (char-code #\#) *ASCII-OFFSET*)))
-    (setf (gethash (- (char-code #\#) *ASCII-OFFSET*) *one-hot-index*) #\#))
-   ;;ASCII 32 - 127: map character to its offsetted index
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- (char-code *default-char*) *ASCII-OFFSET*)))
+    (setf (gethash (- (char-code *default-char*) *ASCII-OFFSET*) *one-hot-index*) *default-char*))
+   ;;ASCII 65 - 127: map character to its offsetted index
    (t 
-    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (- i *ASCII-OFFSET*)))
-    (setf (gethash (- i *ASCII-OFFSET*) *one-hot-index*) (code-char i)))))
+    (setf (gethash (code-char i) *one-hot-hash*) (index-one-hot-vec (1+ (- i *ASCII-OFFSET*))))
+    (setf (gethash (1+ (- i *ASCII-OFFSET*)) *one-hot-index*) (code-char i)))))
 
 
 ;;ASCII characters 32 (space) -> 90 (Z) + line_carriage (13)
@@ -73,50 +78,6 @@
   (gethash (position 1 ohv) *one-hot-index*))
 
 
-;; TRAIN-RNN-INPUT
-;;--------------------------------------
-;; INPUT: train-rnn-func, the function that trains an RNN
-;;        rnn, the rnn to train
-;;        alpha, the alpha value for the rnn
-;;        char-list-input, a list of chars as input
-;;        char-list-output, a list of chars as output
-;; OUTPUT: NIL
-;; SIDE-EFFECT: calls the train-rnn function with the given input output one-hot-vector pairs
-
-(defun train-rnn-input (train-rnn-func rnn alpha debug char-list-input char-list-output)
-  (let
-      ((char-vec-input (make-array (rnn-seq-len rnn) 
-           :initial-contents char-list-input))
-          
-       (char-vec-output (make-array (rnn-seq-len rnn)
-            :initial-contents char-list-output)))
-    (funcall train-rnn-func 
-       rnn 
-       alpha 
-       debug
-       (dotimes (i (rnn-seq-len rnn) char-vec-input)
-         (setf (svref char-vec-input i) (char-one-hot-vec (svref char-vec-input i))))
-       (dotimes (i (rnn-seq-len rnn) char-vec-output)
-         (setf (svref char-vec-output i) (char-one-hot-vec (svref char-vec-output i)))))))
-
-(defun print-curr-rnn (train-rnn-func rnn alpha debug)
-  (babble rnn 50))
-
-(defun print-generated-inputs (sequence-length char-list-input char-list-output)
-  (let
-      ((char-vec-input (make-array sequence-length 
-           :initial-contents char-list-input))
-          
-       (char-vec-output (make-array sequence-length
-            :initial-contents char-list-output)))
-    ;(format t "~A, ~A~%" char-vec-input char-vec-output)
-    (dotimes (i sequence-length char-vec-input)
-      (setf (svref char-vec-input i) (char-one-hot-vec (svref char-vec-input i))))
-    (dotimes (i sequence-length char-vec-output)
-      (setf (svref char-vec-output i) (char-one-hot-vec (svref char-vec-output i))))
-          ;(format t "~A, ~A~%" char-vec-input char-vec-output)))
-    ))
-  
 ;; PROCESS-CHARS
 ;;-------------------------------------
 ;; INPUT: path-to-file, a file path string
@@ -179,44 +140,79 @@
     (/ (- end-time starting-time) 60) 
     num-processed 
     (* (/ (- end-time starting-time) num-processed) 1000))
+  
+  ;;runs the print function at the very end 
   (when print-func
-    (format "~%Final Output:")
+    (format t "~%Final Output:")
     (apply print-func func-params))
+  
   ))))
-      
-;      (labels
-;   ((build-list (curr-char length acc)
-;      (cond
-;       ;;Basecase: next-char is nil, at end of file,
-;       ;;          so close the file
-;       ((not curr-char) (close in))
-;       
-;       ;;Recursive Case 1: acc is not big enough,
-;       ;;                  append the curr-char on to the list
-;       ((< length (1+ sequence-length)) (build-list (read-char in nil) 
-;                (incf length) (append acc (list curr-char))))
-;       ;;Recursive Case 2: acc length is equal to sequence length + 1,
-;       ;;                  run function on acc and append the next char on
-;        ((= (1+ sequence-length) length) (apply process-func (append func-params (list (butlast acc) (rest acc))))
-;           (build-list (read-char in nil) (incf length) (append acc (list curr-char))))
-;        ;;Recursive Case 3: acc length is greater than sequence length,
-;        ;;                  run function on rest of acc and append the next char on the rest of acc
-;        (t (apply process-func (append func-params (list (butlast (rest acc)) (rest (rest acc)))))
-;     (build-list (read-char in nil) length (append (rest acc) (list curr-char)))))))
-;    
-; (build-list (read-char in nil) 0 nil)))))
 
-; (defmacro print-lists (url seq-len)
-;   `(process-chars ,url ,seq-len #'format t "~A, ~A~%"))
 
-; (defmacro generate-inputs-from-text (url seq-len)
-;   `(process-chars ,url ,seq-len #'print-generated-inputs ,seq-len))
+;; TRAIN-RNN-INPUT
+;;--------------------------------------
+;; INPUT: train-rnn-func, the function that trains an RNN
+;;        rnn, the rnn to train
+;;        alpha, the alpha value for the rnn
+;;        char-list-input, a list of chars as input
+;;        char-list-output, a list of chars as output
+;; OUTPUT: NIL
+;; SIDE-EFFECT: calls the train-rnn function with the given input output one-hot-vector pairs
 
-(defmacro train-rnn-text (url train-func rnn alpha debug)
-  `(process-chars ,url (rnn-seq-len ,rnn) #'train-rnn-input #'print-curr-rnn ,train-func ,rnn ,alpha ,debug))
+(defun train-rnn-input (train-rnn-func rnn alpha verbose char-list-input char-list-output)
+  (let
+      ((char-vec-input (make-array (rnn-seq-len rnn) 
+           :initial-contents char-list-input))
+          
+       (char-vec-output (make-array (rnn-seq-len rnn)
+            :initial-contents char-list-output)))
+    (funcall train-rnn-func 
+       rnn 
+       alpha 
+       verbose
+       (dotimes (i (rnn-seq-len rnn) char-vec-input)
+         (setf (svref char-vec-input i) (char-one-hot-vec (svref char-vec-input i))))
+       (dotimes (i (rnn-seq-len rnn) char-vec-output)
+         (setf (svref char-vec-output i) (char-one-hot-vec (svref char-vec-output i)))))))
 
+
+;; PRINT-CURR-RNN
+;;--------------------------------------
+;; INPUT: SAME AS TRAIN-RNN-INPUT
+;; OUTPUT: NIL
+;; SIDE EFFECT: runs the given function every 10 dots
+
+(defun print-curr-rnn (train-rnn-func rnn alpha verbose)
+  (babble rnn 50))
+
+;; TRAIN-RNN-TEXT
+;;---------------------
+;; INPUTS: URL, a path to a text file
+;;         TRAIN-FUNC, the training function
+;;         RNN, an rnn struct
+;;         alpha, the learning rate (float)
+;;         verbose, boolean flag to print outputs at each step
+(defmacro train-rnn-text (url train-func rnn alpha verbose)
+  `(process-chars ,url (rnn-seq-len ,rnn) #'train-rnn-input #'print-curr-rnn ,train-func ,rnn ,alpha ,verbose))
+
+;; TRAIN-TO-SPEAK
+;;---------------------
+;; INPUTS: URL, a path to a text file
+;;         SEQ-LEN, the number of context characters
+;;         NUM-HIDDEN, the number of hidden layers
+;;         ALPHA, the learning rate (float)
+;; OUTPUT: NIL
+;; SIDEFFECT: Trains the RNN and prints out learned characters
 (defun train-to-speak (url seq-len num-hidden alpha)
   (train-rnn-text url #'train-rnn-one (init-rnn seq-len num-hidden) alpha nil))
 
+;; watch-training
+;;---------------------
+;; INPUTS: URL, a path to a text file
+;;         SEQ-LEN, the number of context characters
+;;         NUM-HIDDEN, the number of hidden layers
+;;         ALPHA, the learning rate (float)
+;; OUTPUT: NIL
+;; SIDEFFECT: Trains the RNN and prints out learned characters at each step
 (defun watch-training (url seq-len num-hidden alpha)
   (train-rnn-text url #'train-rnn-one (init-rnn seq-len num-hidden) alpha t))
