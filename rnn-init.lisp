@@ -10,6 +10,7 @@
 ;;; ===============================
 ;;;  Implementation of neural networks
 (defconstant *CC* 96)
+(require :fastseq)
 
 
 ;;;  RNN struct
@@ -309,7 +310,9 @@
 ;;;  SIGMOID(X) = 1/(1 + e^(-x)) -- the sigmoid (or logistic) function
 
 (defun sigmoid (x)
-	(/ 1.0 (+ 1 (exp (- x)))))
+	(handler-case 
+		(/ 1.0 (+ 1 (exp (- x))))
+		(floating-point-underflow () 0)))
 
 ;; DOT-PRODUCT
 ;; -------------------------------
@@ -476,6 +479,7 @@
 				)
 				;h-h
 				;i-h
+
 				(loop for hn from (1- n) downto 0
 					do
 
