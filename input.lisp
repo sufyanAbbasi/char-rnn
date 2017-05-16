@@ -7,8 +7,8 @@
 ;; The following expressions ensure that tail-recursive function calls 
 ;; are handled appropriately/efficiently by the compiler. 
 
-(setq compiler:tail-call-self-merge-switch t)
-(setq compiler:tail-call-non-self-merge-switch t) 
+; (setq compiler:tail-call-self-merge-switch t)
+; (setq compiler:tail-call-non-self-merge-switch t) 
 
 (defparameter *ASCII-LENGTH* 128)
 (defparameter *ASCII-OFFSET* 32)

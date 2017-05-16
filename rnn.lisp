@@ -458,27 +458,55 @@
         ((sl (rnn-seq-len rnn))
             (inputs (make-array sl)))
 
-        ;; Initialize the random seed input
-        (dotimes (sn sl)
-            (setf (svref inputs sn) (make-array *CC* :initial-element 0))
-            (let ((index (random *CC*)))
-                (dotimes (i *CC*)
-                    (when (= index i) (setf (svref (svref inputs sn) i) 1))
-                    )
-                )
-            )
+        ;; Initialize the input
+        (setf inputs (rnn-i-vecks rnn))
 
         (dotimes (i length)
+            
             ;;Feed forward
             (rnn-ff rnn inputs)
             ;; Print the last output character
             (format T "~A" (one-hot-vec-char (to-one-hot (svref (rnn-o-vecks rnn) (- sl 1)))))
             ; Set our output to be the new input
-            (setf inputs (rnn-o-vecks rnn))
+            (dotimes (i sl)
+                (setf (svref inputs i) (to-one-hot (svref (rnn-o-vecks rnn) i)))
+                ;(format T "~A" (one-hot-vec-char (svref inputs i)))
+            )
         )
     )
 )
 
+;;;  BABBLE
+;;; ----------------------------------------------------------
+;;;  INPUTS:  RNN - a recurrent neural network
+;;;              LENGTH - the number of characters to generate  
+;;;  OUTPUT:  nil
+;;;  SIDE-EFFECT:  Prints Seq-len + Length characters from the RNN
+;;;                   Feeding into itself from a random seed input
+(defun babble-input (seed rnn length)
+    (let*
+        ((sl (rnn-seq-len rnn))
+            (inputs (make-array sl)))
+
+        ;; Initialize the input
+        (setf inputs (rnn-i-vecks rnn))
+
+        (dotimes (i length)
+
+            (dotimes (i sl)
+                (format T "~A" (one-hot-vec-char (svref inputs i)))
+            )
+            (format T "~%")
+
+            ;;Feed forward
+            (rnn-ff rnn inputs)
+            ;; Print the last output character
+            ;(format T "~A" (one-hot-vec-char (to-one-hot (svref (rnn-o-vecks rnn) (- sl 1)))))
+            ; Set our output to be the new input
+            (setf inputs (rnn-o-vecks rnn))
+        )
+    )
+)
 
 ;;;  RAND-BABBLE
 ;;; ----------------------------------------------------------
